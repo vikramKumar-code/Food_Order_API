@@ -121,6 +121,226 @@ Food_Order_API/
 
 ---
 
+## 📊 Data Flow Diagrams (DFD)
+
+### 1. Level 0 DFD (Context Diagram)
+The Context Diagram establishes the boundary of the Food Ordering System, mapping all primary interactions between external entities (*Customers, Administrators, Stripe Payment Gateway*) and the central system.
+
+```mermaid
+flowchart TD
+    Customer["👤 Customer / User"]
+    Admin["🛡️ Administrator"]
+    System(("0.0<br/>Food Ordering &<br/>Management System<br/>(Foodly)"))
+    Stripe["💳 Stripe Payment Gateway"]
+
+    %% Customer interactions
+    Customer -->|"Registration & Login Credentials"| System
+    Customer -->|"Search & Category Filter Queries"| System
+    Customer -->|"Cart Actions (Add, Qty, Clear)"| System
+    Customer -->|"Order Placement & Address Info"| System
+    System -->|"JWT Auth Token & Profile"| Customer
+    System -->|"Menu Catalog & Dish Details"| Customer
+    System -->|"Cart Summary & Price Snapshots"| Customer
+    System -->|"Order Confirmation & Status"| Customer
+
+    %% Admin interactions
+    Admin -->|"Admin Credentials"| System
+    Admin -->|"Dish Details (Create, Update, Delete)"| System
+    Admin -->|"Order Delivery Status Updates"| System
+    System -->|"Admin JWT Token"| Admin
+    System -->|"Sales Revenue, Metrics & Inventory"| Admin
+    System -->|"All Customer Orders List"| Admin
+
+    %% Stripe interactions
+    System -->|"Checkout Session Request (INR Line Items)"| Stripe
+    Stripe -->|"Hosted Checkout URL & Session ID"| System
+    Stripe -->|"Webhook Event (checkout.session.completed)"| System
+```
+
+---
+
+### 2. Level 1 DFD (Decomposed System Processes & Data Stores)
+The Level 1 DFD decomposes the system into six modular sub-processes, identifying data interactions across MongoDB collections (*D1 Users, D2 Foods, D3 Carts, D4 Orders*).
+
+```mermaid
+flowchart TD
+    subgraph Entities ["External Entities"]
+        Customer["👤 Customer"]
+        Admin["🛡️ Admin"]
+        Stripe["💳 Stripe API"]
+    end
+
+    subgraph Processes ["Core System Processes"]
+        P1["1.0 User Authentication & RBAC"]
+        P2["2.0 Menu Catalog & Discovery"]
+        P3["3.0 Cart Management & Price Snapshot"]
+        P4["4.0 Order Lifecycle & Placement"]
+        P5["5.0 Payment Gateway & Webhooks"]
+        P6["6.0 Admin Dashboard & Analytics"]
+    end
+
+    subgraph DataStores ["Data Stores (MongoDB Collections)"]
+        D1[("D1: Users Collection")]
+        D2[("D2: Foods Collection")]
+        D3[("D3: Carts Collection")]
+        D4[("D4: Orders Collection")]
+    end
+
+    %% Process 1: Auth
+    Customer -->|"Credentials (email, password)"| P1
+    Admin -->|"Admin Login"| P1
+    P1 <-->|"Validate & Fetch Hash"| D1
+    P1 -->|"JWT Token & User Session"| Customer
+    P1 -->|"Admin JWT Token"| Admin
+
+    %% Process 2: Menu
+    Customer -->|"Browse, Search & Filter"| P2
+    P2 <-->|"Fetch Available Dishes"| D2
+    P2 -->|"Filtered Menu Results"| Customer
+
+    %% Process 3: Cart
+    Customer -->|"Add / Update Item (+ Bearer Token)"| P3
+    P3 <-->|"Fetch Live Price"| D2
+    P3 <-->|"Store Cart & Price Snapshot"| D3
+    P3 -->|"Live Cart Data & Totals"| Customer
+
+    %% Process 4: Orders
+    Customer -->|"Place Order (COD / Address)"| P4
+    P4 <-->|"Read Cart Items"| D3
+    P4 -->|"Create Order Record & Clear Cart"| D4
+    P4 -->|"Order Status & ID"| Customer
+
+    %% Process 5: Payments
+    Customer -->|"Initiate Online Payment"| P5
+    P5 <-->|"Get Cart Total & Snapshot"| D3
+    P5 -->|"Create Pending Order"| D4
+    P5 -->|"Create Session"| Stripe
+    Stripe -->|"Checkout URL"| P5
+    P5 -->|"Redirect to Stripe"| Customer
+    Stripe -->|"Webhook: Session Paid"| P5
+    P5 -->|"Update Status: Paid & Confirmed"| D4
+
+    %% Process 6: Admin Operations
+    Admin -->|"CRUD Dish Operations"| P6
+    P6 <-->|"Add/Edit/Delete Food"| D2
+    Admin -->|"Update Order Status"| P6
+    P6 <-->|"Update Status / Read All"| D4
+    P6 <-->|"Count Users & Aggregate Revenue"| D1
+    P6 -->|"Metrics, Revenue & Orders"| Admin
+```
+
+---
+
+## 🔄 Core System Workflows
+
+### 1. Customer Ordering & Checkout Workflow
+End-to-end journey of a customer from discovering delicacies to placing an order.
+
+```mermaid
+flowchart TD
+    Start(["Start: Customer Visits Foodly"]) --> Browse["Browse Menu on Dishes Page"]
+    Browse --> Filters{"Apply Filters?"}
+    Filters -->|Yes| ApplyFilters["Search keywords, Filter Category, Toggle Pure-Veg, Sort Price"]
+    Filters -->|No| ViewCards["View Dish Cards & Details Page"]
+    ApplyFilters --> ViewCards
+
+    ViewCards --> AddCart["Add Dish to Cart / Adjust Stepper (+/-)"]
+    AddCart --> PersistentCart["Cart State Saved in LocalStorage & Synced"]
+    PersistentCart --> OpenCart["Open Shopping Cart Page (/cart)"]
+
+    OpenCart --> ReviewCart{"Review Items & Apply Promo?"}
+    ReviewCart -->|Apply Coupon| Coupon["Enter 'FOODLY20' or 'WELCOME50' (20% - 50% Off)"]
+    ReviewCart -->|Direct Checkout| EnterAddress["Enter Delivery Address"]
+    Coupon --> EnterAddress
+
+    EnterAddress --> PayChoice{"Select Payment Method"}
+
+    %% COD Path
+    PayChoice -->|"Cash on Delivery (COD)"| PlaceCOD["Click 'Confirm & Place Order'"]
+    PlaceCOD --> CreateOrderCOD["API: POST /api/orders (status: pending, paymentStatus: unpaid)"]
+    CreateOrderCOD --> SuccessPage["Show Order Success Screen & Clear Cart"]
+
+    %% Stripe Path
+    PayChoice -->|"Online Card (Stripe)"| InitStripe["Click 'Proceed to Stripe Pay'"]
+    InitStripe --> AuthCheck{"Authenticated?"}
+    AuthCheck -->|No| RedirectAuth["Redirect to /auth (with Return Path saved)"]
+    RedirectAuth --> LoginSuccess["User Signs In"] --> InitStripe
+    AuthCheck -->|Yes| CallStripeAPI["API: POST /api/payment/create-checkout-session"]
+    CallStripeAPI --> StripePage["Redirect to Stripe Hosted Checkout"]
+    StripePage --> CardPayment["Customer Completes Payment"]
+    CardPayment --> WebhookTrigger["Stripe Dispatches Webhook: checkout.session.completed"]
+    WebhookTrigger --> OrderConfirmed["Order Updated: paymentStatus = paid, status = confirmed"]
+    OrderConfirmed --> SuccessRedirect["Redirect to /payment-success & Delivery Initiated"]
+```
+
+---
+
+### 2. Stripe Payment & Webhook Lifecycle
+Sequence diagram detailing the secure raw-buffer webhook verification and asynchronous payment reconciliation.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Customer as 👤 Customer (Frontend)
+    participant API as ⚙️ Express Backend
+    participant Stripe as 💳 Stripe Checkout
+    participant DB as 🍃 MongoDB (Order & Cart)
+    actor HookServer as ⚡ Stripe Webhook Dispatcher
+
+    Customer->>API: POST /api/payment/create-checkout-session (Address + Token)
+    API->>DB: Fetch Cart with items & priceSnapshots
+    API->>DB: Create Order (status: "pending", paymentStatus: "unpaid")
+    API->>Stripe: stripe.checkout.sessions.create(lineItems, metadata: { orderId })
+    Stripe-->>API: Return session (id, url)
+    API->>DB: Save session.id to Order, clear Cart items
+    API-->>Customer: Return { checkoutUrl, sessionId, orderId }
+    Customer->>Stripe: Browser Redirect to Stripe Hosted Checkout
+    Customer->>Stripe: Enter Card Details & Authorize Payment
+    Stripe-->>Customer: Payment Authorized
+    HookServer->>API: POST /api/payment/webhook (Stripe Signature Header + Raw Body)
+    Note over API: Verifies Signature with STRIPE_WEBHOOK_SECRET
+    alt Valid Signature & Event = checkout.session.completed
+        API->>DB: Order.findByIdAndUpdate(orderId, { paymentStatus: "paid", status: "confirmed" })
+        API-->>HookServer: 200 OK { received: true }
+        Customer->>Customer: Redirect to /payment-success?session_id=...
+    else Webhook Signature Fails
+        API-->>HookServer: 400 Bad Request (Signature Error)
+    end
+```
+
+---
+
+### 3. Administrator Operations & Catalog Workflow
+Workflow representing role-based authorization guards, dashboard telemetry, and menu management.
+
+```mermaid
+flowchart LR
+    AdminLogin["Admin Accesses /admin/manage"] --> Guard{"ProtectedRoute Guard"}
+    Guard -->|"Not Logged In"| RedirectLogin["Redirect to /auth"]
+    Guard -->|"Logged in as Regular User"| Denied["Display 'Admin Privileges Required' Screen"]
+    Guard -->|"Authenticated Admin"| Dashboard["Grant Access to Admin Studio"]
+
+    Dashboard --> Telemetry["Review KPI Telemetry Cards: Total Dishes, Pure-Veg, Non-Veg, Avg Price"]
+    Dashboard --> CatalogAction{"Choose Action"}
+
+    CatalogAction -->|"Add New Dish"| OpenForm["Open DishForm Studio with Live Image Preview"]
+    OpenForm --> Validate["Input Name, Category, Price, Veg/Non-Veg, Image URL"]
+    Validate --> SubmitNew["Submit ➔ API: POST /api/foods (Admin Token)"]
+    SubmitNew --> UpdateInventory["Catalog State Updated in MongoDB & Live UI"]
+
+    CatalogAction -->|"Edit Existing Dish"| SelectEdit["Click 'Edit' on Dish Row in Inventory Table"]
+    SelectEdit --> PreFill["Form Automatically Pre-filled with Dish Details"]
+    PreFill --> UpdateFields["Modify Price, Availability, or Category"]
+    UpdateFields --> SubmitUpdate["Submit ➔ API: PUT /api/foods/:id"]
+    SubmitUpdate --> UpdateInventory
+
+    CatalogAction -->|"Delete Dish"| ConfirmDel["Click 'Delete' & Confirm Modal"]
+    ConfirmDel --> SubmitDel["API: DELETE /api/foods/:id"]
+    SubmitDel --> UpdateInventory
+```
+
+---
+
 ## 💻 Tech Stack
 
 | Domain | Technologies |
