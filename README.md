@@ -8,6 +8,15 @@ A modern, production-grade full-stack food delivery application built with **Rea
 
 ### 🎨 Frontend (Client App)
 * **Modern & Appetizing UI**: Glassmorphic sticky navigation, vibrant foodie color palette, fluid micro-interactions, and mobile-responsive drawer.
+* **Full Authentication & User System**:
+  * Complete **Sign In** and **Sign Up** portal (`/auth`) connected to backend endpoints.
+  * Stateless session management via JWT tokens stored in `localStorage`.
+  * Topbar user profile pill showing avatar initials, role indicator, and sign-out dropdown.
+  * One-click demo credential autofill for rapid testing.
+* **Protected Routes & Role Security**:
+  * **ProtectedRoute** guard wrapping administrative pages (`/admin/manage`, `/add-dish`).
+  * Automatic redirect to `/auth` with return path tracking if unauthenticated.
+  * Access denied screen if an authenticated user lacks the `admin` role.
 * **Interactive Food Discovery**:
   * Real-time search by dish name, ingredients, or keywords.
   * Category filter pills (*Main Course, Breakfast, Snacks, Desserts, Beverages*).
@@ -20,7 +29,7 @@ A modern, production-grade full-stack food delivery application built with **Rea
   * Promo discount vouchers (e.g., `FOODLY20`, `WELCOME50`).
   * Delivery address input and payment mode toggle (Cash on Delivery / Stripe Online Pay).
 * **Single Dish Showcase**: Detailed page with nutritional tags, chef picks, preparation time, and quantity selector.
-* **Admin Management Portal**:
+* **Admin Management Studio**:
   * Real-time KPI metric cards (*Total Dishes, Veg, Non-Veg, Average Price*).
   * Live inventory table with instant search, edit, and deletion capabilities.
   * Add & Edit dish form featuring **live image URL preview**.
@@ -86,13 +95,16 @@ Food_Order_API/
 │   │   │   ├── DishTable.jsx
 │   │   │   ├── FoodCard.jsx
 │   │   │   ├── Icons.jsx
+│   │   │   ├── ProtectedRoute.jsx   # Route security guard
 │   │   │   └── SectionHeading.jsx
 │   │   ├── context/        # React Context stores
-│   │   │   ├── CartContext.jsx
-│   │   │   └── DishesContext.jsx
+│   │   │   ├── AuthContext.jsx      # Live JWT & user store
+│   │   │   ├── CartContext.jsx      # Shopping cart store
+│   │   │   └── DishesContext.jsx    # Catalog store
 │   │   ├── pages/          # Application views
 │   │   │   ├── AddDishPage.jsx
 │   │   │   ├── AdminManagePage.jsx
+│   │   │   ├── AuthPage.jsx         # Sign in / Sign up page
 │   │   │   ├── CartPage.jsx
 │   │   │   ├── DishDetailsPage.jsx
 │   │   │   ├── DishesPage.jsx
@@ -103,7 +115,7 @@ Food_Order_API/
 │   │   ├── data.js         # Default dishes data
 │   │   └── main.jsx
 │   ├── package.json
-│   └── vite.config.js
+│   └── vite.config.js      # Reverse proxy to backend (port 5000)
 └── README.md
 ```
 
@@ -135,10 +147,10 @@ cp .env.example .env
 ### Required Variables (`Backend/.env`)
 
 ```env
-# Server Port
-PORT=3000
+# Server Port (matches Vite reverse proxy target)
+PORT=5000
 
-# MongoDB Connection String (Atlas URI or local mongodb instance)
+# MongoDB Connection String (Atlas URI or local MongoDB instance)
 MONGO_URI=mongodb+srv://<username>:<password>@cluster0.mongodb.net/food_order_db?retryWrites=true&w=majority
 
 # Secret key for JWT signing & verification (generate a strong random string)
@@ -174,7 +186,7 @@ CLIENT_URL=http://localhost:5173
    npm install
    ```
 3. Configure your `.env` file as shown in the [Environment Variables](#-environment-variables-setup) section.
-4. (Optional) Seed the initial admin account:
+4. Seed the initial admin account (`admin@test.com` / `admin123`):
    ```bash
    node scripts/seedAdmin.js
    ```
@@ -182,7 +194,7 @@ CLIENT_URL=http://localhost:5173
    ```bash
    npm run dev
    ```
-   The API server will run at: `http://localhost:3000`
+   The API server will run at: `http://localhost:5000`
 
 ---
 
@@ -204,6 +216,27 @@ CLIENT_URL=http://localhost:5173
    ```
    http://localhost:5173
    ```
+   *Vite automatically forwards all `/api/*` requests to the backend server running on `http://localhost:5000`.*
+
+---
+
+## 🛡️ Protected Authentication & Role Access
+
+* **Public Routes**:
+  * `/` (Hero & Highlights)
+  * `/dishes` (Catalog with search & filters)
+  * `/dish/:id` (Dish Details)
+  * `/cart` (Cart summary & preparation)
+  * `/auth` (Sign in & registration portal)
+* **Protected Admin Routes**:
+  * `/admin/manage` (Catalog inventory & metrics)
+  * `/add-dish` (New dish creation studio)
+
+### Seeded Test Credentials:
+| Account Type | Email | Password | Role |
+|---|---|---|---|
+| **Admin** | `admin@test.com` | `admin123` | `admin` (Full dashboard access) |
+| **User** | Register via `/auth` | Any valid pass | `user` (Browsing & ordering) |
 
 ---
 
@@ -290,4 +323,3 @@ The backend includes standalone automated test suites:
 ## 📄 License
 
 This project is open-source and available under the [ISC License](file:///e:/Desktop/web dev/Food_Order_API/Backend/package.json).
-

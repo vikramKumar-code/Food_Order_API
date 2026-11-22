@@ -57,3 +57,4 @@ export function ProtectedRoute({ children, adminOnly = false }) {
   // 3. User is authorized
   return children;
 }
+
