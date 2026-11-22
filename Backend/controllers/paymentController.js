@@ -37,7 +37,7 @@ export const createCheckoutSession = async (req, res) => {
         unit_amount: Math.round(item.priceSnapshot * 100),
       },
       quantity: item.quantity,
-    }));
+      }));
 
     // 3. Calculate total for order record
     const totalAmount = cart.items.reduce(
@@ -120,7 +120,7 @@ export const handleStripeWebhook = async (req, res) => {
   if (event.type === "checkout.session.completed") {
     const session = event.data.object;
     const orderId = session.metadata?.orderId;
-
+  
     if (orderId) {
       await Order.findByIdAndUpdate(orderId, {
         paymentStatus: "paid",

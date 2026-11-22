@@ -17,7 +17,6 @@ export const auth = async (req,res,next)=>{
           message: "Token not found"
         })
     }
-
     const decode = jwt.verify(token,process.env.JWT_SECRET)
     if(!decode || !decode._id) {
       return res.status(401).json({
@@ -25,7 +24,6 @@ export const auth = async (req,res,next)=>{
           message: "Token not valid"
         })
     } 
-
     const user = await User.findById(decode._id).select("-password")
     if(!user){
       return res.status(401).json({
@@ -35,7 +33,6 @@ export const auth = async (req,res,next)=>{
     }
     req.user = user
     next()
-
   } catch (error) {
     return res.status(401).json({
           status: "fail",
