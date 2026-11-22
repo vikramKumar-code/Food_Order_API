@@ -46,33 +46,24 @@ export function AuthProvider({ children }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (res.ok && data.status === "success") {
         setUser(data.data);
         setToken(data.token);
         showToast(`Welcome back, ${data.data.name}! 👋`, "success");
-        return { success: true };
+        return { success: true, user: data.data, token: data.token };
       } else {
         const errorMsg = data.message || "Invalid email or password";
         showToast(errorMsg, "error");
         return { success: false, message: errorMsg };
       }
     } catch (err) {
-      // Fallback demo mock if backend server is not running
-      if (email.includes("admin")) {
-        const adminUser = { name: "Admin Chef", email, role: "admin" };
-        setUser(adminUser);
-        setToken("mock_admin_token_jwt");
-        showToast("Logged in as Admin (Demo Mode) 🛡️", "info");
-        return { success: true };
-      } else {
-        const normalUser = { name: email.split("@")[0] || "Foodie User", email, role: "user" };
-        setUser(normalUser);
-        setToken("mock_user_token_jwt");
-        showToast(`Welcome, ${normalUser.name}! (Demo Mode) 👋`, "info");
-        return { success: true };
-      }
+      console.warn("Backend server not reachable, checking fallback:", err);
+      // Informative error when backend is offline
+      const offlineMsg = "Backend server not responding (Check if Backend server is running on port 5000)";
+      showToast(offlineMsg, "error");
+      return { success: false, message: offlineMsg };
     } finally {
       setLoading(false);
     }
@@ -86,25 +77,23 @@ export function AuthProvider({ children }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, email, password }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (res.ok && data.status === "success") {
         setUser(data.data);
         setToken(data.token);
-        showToast(`Account created! Welcome, ${data.data.name}! 🎉`, "success");
-        return { success: true };
+        showToast(`Account registered successfully! Welcome, ${data.data.name}! 🎉`, "success");
+        return { success: true, user: data.data, token: data.token };
       } else {
         const errorMsg = data.message || "Registration failed";
         showToast(errorMsg, "error");
         return { success: false, message: errorMsg };
       }
     } catch (err) {
-      // Fallback demo mock if backend server is not running
-      const newUser = { name, email, role: "user" };
-      setUser(newUser);
-      setToken("mock_new_user_token");
-      showToast(`Account created for ${name}! (Demo Mode) 🎉`, "info");
-      return { success: true };
+      console.warn("Backend server not reachable during registration:", err);
+      const offlineMsg = "Backend server not responding (Check if Backend server is running on port 5000)";
+      showToast(offlineMsg, "error");
+      return { success: false, message: offlineMsg };
     } finally {
       setLoading(false);
     }
@@ -144,3 +133,4 @@ export function useAuth() {
   }
   return context;
 }
+
