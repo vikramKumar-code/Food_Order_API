@@ -133,6 +133,23 @@ export function AuthPage() {
         </p>
       </div>
 
+      {/* Redirect Notice */}
+      {from && from !== "/" && (
+        <div style={{
+          padding: "0.75rem 1rem",
+          background: "var(--color-primary-light)",
+          color: "var(--color-primary)",
+          borderRadius: "var(--radius-md)",
+          fontSize: "0.88rem",
+          fontWeight: 700,
+          marginBottom: "1.4rem",
+          textAlign: "center",
+          border: "1px solid rgba(255, 77, 21, 0.2)"
+        }}>
+          🔒 Please sign in to access {from}
+        </div>
+      )}
+
       {/* Tabs */}
       <div style={{
         display: "flex",
@@ -304,3 +321,4 @@ export function AuthPage() {
     </section>
   );
 }
+
